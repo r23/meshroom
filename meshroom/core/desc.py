@@ -38,8 +38,13 @@ class Attribute(BaseObject):
         """
         return value
 
-    def matchDescription(self, value):
-        """ Returns whether the value perfectly match attribute's description. """
+    def matchDescription(self, value, conform=False):
+        """ Returns whether the value perfectly match attribute's description.
+
+        Args:
+            value: the value
+            conform: try to adapt value to match the description
+        """
         try:
             self.validateValue(value)
         except ValueError:
@@ -66,13 +71,13 @@ class ListAttribute(Attribute):
             raise ValueError('ListAttribute only supports list/tuple input values (param:{}, value:{}, type:{})'.format(self.name, value, type(value)))
         return value
 
-    def matchDescription(self, value):
+    def matchDescription(self, value, conform=False):
         """ Check that 'value' content matches ListAttribute's element description. """
-        if not super(ListAttribute, self).matchDescription(value):
+        if not super(ListAttribute, self).matchDescription(value, conform):
             return False
         # list must be homogeneous: only test first element
         if value:
-            return self._elementDesc.matchDescription(value[0])
+            return self._elementDesc.matchDescription(value[0], conform)
         return True
 
 
@@ -97,20 +102,32 @@ class GroupAttribute(Attribute):
             raise ValueError('Value contains key that does not match group description : {}'.format(invalidKeys))
         return value
 
-    def matchDescription(self, value):
+    def matchDescription(self, value, conform=False):
         """
         Check that 'value' contains the exact same set of keys as GroupAttribute's group description
         and that every child value match corresponding child attribute description.
+
+        Args:
+            value: the value
+            conform: remove entries that don't exist in the description.
         """
         if not super(GroupAttribute, self).matchDescription(value):
             return False
         attrMap = {attr.name: attr for attr in self._groupDesc}
-        # must have the exact same child attributes
-        if sorted(value.keys()) != sorted(attrMap.keys()):
-            return False
+
+        if conform:
+            # remove invalid keys
+            invalidKeys = set(value.keys()).difference([attr.name for attr in self._groupDesc])
+            for k in invalidKeys:
+                del self._groupDesc[k]
+        else:
+            # must have the exact same child attributes
+            if sorted(value.keys()) != sorted(attrMap.keys()):
+                return False
+
         for k, v in value.items():
             # each child value must match corresponding child attribute description
-            if not attrMap[k].matchDescription(v):
+            if not attrMap[k].matchDescription(v, conform):
                 return False
         return True
 
@@ -318,13 +335,14 @@ class DynamicNodeSize(object):
 
     def computeSize(self, node):
         param = node.attribute(self._param)
-        assert param.isInput
         # Link: use linked node's size
         if param.isLink:
             return param.getLinkParam().node.size
         # ListAttribute: use list size
         if isinstance(param.desc, ListAttribute):
             return len(param)
+        if isinstance(param.desc, IntParam):
+            return param.value
         return 1
 
 
@@ -383,7 +401,26 @@ class Node(object):
     def __init__(self):
         pass
 
-    def updateInternals(self, node):
+    @classmethod
+    def update(cls, node):
+        """ Method call before node's internal update on invalidation.
+
+        Args:
+            node: the BaseNode instance being updated
+        See Also:
+            BaseNode.updateInternals
+        """
+        pass
+
+    @classmethod
+    def postUpdate(cls, node):
+        """ Method call after node's internal update on invalidation.
+
+        Args:
+            node: the BaseNode instance being updated
+        See Also:
+            NodeBase.updateInternals
+        """
         pass
 
     def stopProcess(self, chunk):
@@ -409,7 +446,7 @@ class CommandLineNode(Node):
             if not alreadyInEnv:
                 cmdPrefix = '{rez} {packageFullName} -- '.format(rez=os.environ.get('REZ_ENV'), packageFullName=chunk.node.packageFullName)
         cmdSuffix = ''
-        if chunk.range:
+        if chunk.node.isParallelized:
             cmdSuffix = ' ' + self.commandLineRange.format(**chunk.range.toDict())
         return cmdPrefix + chunk.node.nodeDesc.commandLine.format(**chunk.node._cmdVars) + cmdSuffix
 

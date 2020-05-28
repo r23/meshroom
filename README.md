@@ -1,5 +1,7 @@
 # ![Meshroom - 3D Reconstruction Software](/docs/logo/banner-meshroom.png)
 
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2997/badge)](https://bestpractices.coreinfrastructure.org/projects/2997)
+
 Meshroom is a free, open-source 3D Reconstruction Software based on the [AliceVision](https://github.com/alicevision/AliceVision) Photogrammetric Computer Vision framework.
 
 Learn more details about the pipeline on [AliceVision website](http://alicevision.github.io).
@@ -19,6 +21,12 @@ Photography is the projection of a 3D scene onto a 2D plane, losing depth inform
 The goal of photogrammetry is to reverse this process.
 
 See the [presentation of the pipeline steps](http://alicevision.github.io/#photogrammetry).
+
+
+## Manual
+
+https://meshroom-manual.readthedocs.io
+
 
 ## Tutorials
 
@@ -42,6 +50,7 @@ Overall presentation of the protogrammetry practice with Meshroom and detailed p
 
 Presentation of the Meshroom software with a focus on using it for Match Moving.
 
+
 ## License
 
 The project is released under MPLv2, see [**COPYING.md**](COPYING.md).
@@ -57,6 +66,7 @@ git clone --recursive git://github.com/alicevision/meshroom
 cd meshroom
 pip install -r requirements.txt
 ```
+
 
 ## Start Meshroom
 

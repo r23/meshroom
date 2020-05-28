@@ -62,6 +62,18 @@ class StructureFromMotion(desc.CommandLineNode):
             uid=[0],
             advanced=True,
         ),
+        desc.ChoiceParam(
+            name='observationConstraint',
+            label='Observation Constraint',
+            description='Observation contraint mode used in the optimization:\n'
+                        ' * Basic: Use standard reprojection error in pixel coordinates\n'
+                        ' * Scale: Use reprojection error in pixel coordinates but relative to the feature scale',
+            value='Basic',
+            values=['Basic', 'Scale'],
+            exclusive=True,
+            uid=[0],
+            advanced=True,
+        ),
         desc.IntParam(
             name='localizerEstimatorMaxIterations',
             label='Localizer Max Ransac Iterations',
@@ -112,6 +124,15 @@ class StructureFromMotion(desc.CommandLineNode):
             description='Maximum number of matches per image pair (and per feature type). \n'
                         'This can be useful to have a quick reconstruction overview. \n'
                         '0 means no limit.',
+            value=0,
+            range=(0, 50000, 1),
+            uid=[0],
+        ),
+        desc.IntParam(
+            name='minNumberOfMatches',
+            label='Minimum Number of Matches',
+            description='Minimum number of matches per image pair (and per feature type). \n'
+                        'This can be useful to have a meaningful reconstruction with accurate keypoints. 0 means no limit.',
             value=0,
             range=(0, 50000, 1),
             uid=[0],
@@ -207,6 +228,14 @@ class StructureFromMotion(desc.CommandLineNode):
             value=False,
             uid=[0],
         ),
+        desc.BoolParam(
+            name='filterTrackForks',
+            label='Filter Track Forks',
+            description='Enable/Disable the track forks removal. A track contains a fork when incoherent matches \n'
+                        'lead to multiple features in the same image for a single track. \n',
+            value=True,
+            uid=[0],
+        ),
         desc.File(
             name='initialPairA',
             label='Initial Pair A',
@@ -267,19 +296,20 @@ class StructureFromMotion(desc.CommandLineNode):
     ]
 
     @staticmethod
-    def getViewsAndPoses(node):
+    def getResults(node):
         """
-        Parse SfM result and return views and poses as two dict with viewId and poseId as keys.
+        Parse SfM result and return views, poses and intrinsics as three dicts with viewId, poseId and intrinsicId as keys.
         """
         reportFile = node.outputViewsAndPoses.value
         if not os.path.exists(reportFile):
-            return {}, {}
+            return {}, {}, {}
 
         with open(reportFile) as jsonFile:
             report = json.load(jsonFile)
 
         views = dict()
         poses = dict()
+        intrinsics = dict()
 
         for view in report['views']:
             views[view['viewId']] = view
@@ -287,4 +317,7 @@ class StructureFromMotion(desc.CommandLineNode):
         for pose in report['poses']:
             poses[pose['poseId']] = pose['pose']
 
-        return views, poses
+        for intrinsic in report['intrinsics']:
+            intrinsics[intrinsic['intrinsicId']] = intrinsic
+
+        return views, poses, intrinsics

@@ -23,7 +23,7 @@ Item {
     readonly property variant cameraInits: _reconstruction.cameraInits
     property bool readOnly: false
     readonly property Viewer3D viewer3D: viewer3D
-
+    readonly property Viewer2D viewer2D: viewer2D
 
     implicitWidth: 300
     implicitHeight: 400
@@ -64,9 +64,9 @@ Item {
                 Layout.fillHeight: true
                 readOnly: root.readOnly
                 cameraInits: root.cameraInits
-                cameraInit: _reconstruction.cameraInit
+                cameraInit: reconstruction.cameraInit
+                hdrCameraInit: reconstruction.hdrCameraInit
                 currentIndex: reconstruction.cameraInitIndex
-                onCurrentIndexChanged: reconstruction.cameraInitIndex = currentIndex
                 onRemoveImageRequest: reconstruction.removeAttribute(attribute)
                 onFilesDropped: reconstruction.handleFilesDrop(drop, augmentSfm ? null : cameraInit)
             }
@@ -81,10 +81,42 @@ Item {
             title: "Image Viewer"
             Layout.fillHeight: true
             Layout.fillWidth: true
-            Layout.minimumWidth: 40
+            Layout.minimumWidth: 50
+
+            headerBar: RowLayout {
+                MaterialToolButton {
+                    text: MaterialIcons.more_vert
+                    font.pointSize: 11
+                    padding: 2
+                    checkable: true
+                    checked: imageViewerMenu.visible
+                    onClicked: imageViewerMenu.open()
+                    Menu {
+                        id: imageViewerMenu
+                        y: parent.height
+                        x: -width + parent.width
+                        Action {
+                            id: displayImageToolBarAction
+                            text: "Display HDR Toolbar"
+                            checkable: true
+                            checked: true
+                            enabled: viewer2D.useFloatImageViewer
+                        }
+                        Action {
+                            id: displayImagePathAction
+                            text: "Display Image Path"
+                            checkable: true
+                            checked: true
+                        }
+                    }
+                }
+            }
+
             Viewer2D {
                 id: viewer2D
                 anchors.fill: parent
+
+                viewIn3D: root.load3DMedia
 
                 Connections {
                     target: imageGallery
@@ -116,33 +148,49 @@ Item {
             Layout.minimumWidth: 20
             Layout.minimumHeight: 80
 
-            Viewer3D {
-                id: viewer3D
-
+            Controls1.SplitView {
                 anchors.fill: parent
-                inspector.uigraph: reconstruction
+                Viewer3D {
+                    id: viewer3D
 
-                DropArea {
-                    anchors.fill: parent
-                    keys: ["text/uri-list"]
-                    onDropped: {
-                        drop.urls.forEach(function(url){ load3DMedia(url); });
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.minimumWidth: 20
+
+                    DropArea {
+                        anchors.fill: parent
+                        keys: ["text/uri-list"]
+                        onDropped: {
+                            drop.urls.forEach(function(url){ load3DMedia(url); });
+                        }
+                    }
+
+                    // Load reconstructed model
+                    Button {
+                        readonly property var outputAttribute: _reconstruction.texturing ? _reconstruction.texturing.attribute("outputMesh") : null
+                        readonly property bool outputReady: outputAttribute && _reconstruction.texturing.globalStatus === "SUCCESS"
+                        readonly property int outputMediaIndex: viewer3D.library.find(outputAttribute)
+
+                        text: "Load Model"
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 10
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: outputReady && outputMediaIndex == -1
+                        onClicked: viewer3D.view(_reconstruction.texturing.attribute("outputMesh"))
                     }
                 }
-            }
 
-            // Load reconstructed model
-            Button {
-                readonly property var outputAttribute: _reconstruction.endNode ? _reconstruction.endNode.attribute("outputMesh") : null
-                readonly property bool outputReady: outputAttribute && _reconstruction.endNode.globalStatus === "SUCCESS"
-                readonly property int outputMediaIndex: viewer3D.library.find(outputAttribute)
+                // Inspector Panel
+                Inspector3D {
+                    id: inspector3d
+                    width: 200
+                    Layout.minimumWidth: 5
 
-                text: "Load Model"
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 10
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: outputReady && outputMediaIndex == -1
-                onClicked: viewer3D.view(_reconstruction.endNode.attribute("outputMesh"))
+                    mediaLibrary: viewer3D.library
+                    camera: viewer3D.mainCamera
+                    uigraph: reconstruction
+                    onNodeActivated: _reconstruction.setActiveNodeOfType(node)
+                }
             }
         }
     }
